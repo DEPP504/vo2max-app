@@ -29,7 +29,13 @@ with tab1:
     if api_key:
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            except:
+            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            # 拿掉 'models/' 前綴嘗試
+            model = genai.GenerativeModel(available_models[0].replace('models/', ''))
+        
+        st.success(f"系統已成功連線")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -67,4 +73,5 @@ with tab2:
         st.line_chart(df.set_index("日期")["VO2_Max"])
         st.dataframe(df)
     else:
+
         st.write("目前尚無歷史紀錄。")
