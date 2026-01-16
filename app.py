@@ -5,12 +5,11 @@ import datetime
 from streamlit_gsheets import GSheetsConnection
 
 # --- 試算表設定 ---
-# 這是你提供的 Google Sheets 網址
 SHEET_URL = "https://docs.google.com/spreadsheets/d/16niyheTwWVts9A6aKRiOx2OpJypQAIeodE08TN9cERU/edit?usp=sharing"
 
-# --- 介面設定 (移除隱私名稱) ---
+# --- 介面設定 ---
 st.set_page_config(page_title="AI 全能運動教練", layout="wide")
-st.title("🏃‍♂️ 跑步生理數據與 $VO_2 Max$ 永久分析系統")
+st.title("🚀 AI 運動表現分析與進步預測系統")
 
 # --- 欄位記憶功能 ---
 if 'weight' not in st.session_state: st.session_state.weight = 80.0
@@ -22,7 +21,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 api_key = st.sidebar.text_input("輸入 Gemini API Key", type="password")
 
-tab1, tab2 = st.tabs(["數據推算", "永久趨勢分析"])
+tab1, tab2 = st.tabs(["數據推算與分析", "長期趨勢與預測"])
 
 with tab1:
     if api_key:
@@ -33,49 +32,37 @@ with tab1:
             st.divider()
             col1, col2 = st.columns(2)
             with col1:
-                st.session_state.weight = st.number_input("體重 (kg)", value=st.session_state.weight)
+                st.subheader("📊 生理與技術指標")
+                st.session_state.weight = st.number_input("體 weight (kg)", value=st.session_state.weight)
                 st.session_state.max_hr = st.number_input("最大心率 (bpm)", value=st.session_state.max_hr)
                 st.session_state.rest_hr = st.number_input("安靜心率 (bpm)", value=st.session_state.rest_hr)
+                gct = st.number_input("觸地時間 (ms) - 選填", value=200, help="頂尖跑者通常低於 200ms")
+                v_osc = st.number_input("垂直振幅 (cm) - 選填", value=8.0)
+            
             with col2:
+                st.subheader("📅 訓練內容")
                 run_date = st.date_input("訓練日期", datetime.date.today())
                 run_type = st.selectbox("訓練類型", ["間歇跑 (Interval)", "穩定跑 (E/M/T)"])
+                raw_data = st.text_area("請貼上 Lap 數據", height=150, placeholder="例如：1. 2:47/km, HR 175...")
 
-            raw_data = st.text_area("請貼上 Lap 數據", height=150)
-
-            if st.button("開始 AI 數據分析"):
-                with st.spinner("AI 正在根據生理指標計算中..."):
-                    prompt = f"你是教練。分析生理指標：體重{st.session_state.weight}, MHR:{st.session_state.max_hr}, RHR:{st.session_state.rest_hr}。數據：{raw_data}"
+            if st.button("啟動 AI 深度分析"):
+                with st.spinner("AI 教練正在交叉比對生理與技術指標..."):
+                    prompt = f"""
+                    你是一位運動科學家。分析以下數據並給出專業評價：
+                    - 生理指標：體重{st.session_state.weight}kg, MHR:{st.session_state.max_hr}, RHR:{st.session_state.rest_hr}。
+                    - 技術指標：觸地時間{gct}ms, 垂直振幅{v_osc}cm。
+                    - 跑步數據：{raw_data}
+                    
+                    請執行：
+                    1. 根據觸地時間與速度，分析跑者的彈性回饋效率。
+                    2. 推算 VO2 Max 數字。
+                    3. 給出下週的針對性建議（關於如何維持速度並減少觸地時間）。
+                    """
                     response = model.generate_content(prompt)
                     st.markdown(response.text)
                 
                 st.divider()
-                final_vo2 = st.number_input("請確認推算出的 VO2 Max 數字", value=42.0, step=0.1)
-                
+                st.subheader("確認存檔")
+                final_vo2 = st.number_input("確認推算的 VO2 Max", value=42.0, step=0.1)
                 if st.button("確認存入 Google Sheets"):
-                    # 讀取現有數據
-                    existing_data = conn.read(spreadsheet=SHEET_URL, usecols=[0,1,2])
-                    new_entry = pd.DataFrame([[str(run_date), final_vo2, run_type]], columns=["日期", "VO2_Max", "類型"])
-                    updated_df = pd.concat([existing_data, new_entry], ignore_index=True)
-                    
-                    # 寫回試算表
-                    conn.update(spreadsheet=SHEET_URL, data=updated_df)
-                    st.success("🎉 數據已成功同步至 Google Sheets！這份紀錄將永久保存。")
-                    
-        except Exception as e:
-            st.error(f"系統錯誤：{e}")
-    else:
-        st.info("請輸入 API Key 以開始使用。")
-
-with tab2:
-    st.header("📈 $VO_2 Max$ 永久成長曲線")
-    try:
-        # 直接從 Google Sheets 讀取最新數據
-        df = conn.read(spreadsheet=SHEET_URL)
-        if not df.empty:
-            df = df.sort_values("日期")
-            st.line_chart(df.set_index("日期")["VO2_Max"])
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.write("試算表目前是空的，快去推算第一筆數據吧！")
-    except:
-        st.write("目前連線不到試算表，請確認網址與權限。")
+                    existing_data = conn.read(
