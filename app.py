@@ -4,11 +4,11 @@ import pandas as pd
 import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# --- 試算表與設定 ---
+# --- 試算表設定 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/16niyheTwWVts9A6aKRiOx2OpJypQAIeodE08TN9cERU/edit?usp=sharing"
 
 def push_to_sheets(conn, run_date, final_vo2, run_type, gct, v_osc):
-    """獨立存檔函數，確保邏輯結構穩定"""
+    """獨立存檔函數"""
     try:
         existing_data = conn.read(spreadsheet=SHEET_URL)
         new_entry = pd.DataFrame({
@@ -20,7 +20,7 @@ def push_to_sheets(conn, run_date, final_vo2, run_type, gct, v_osc):
         })
         updated_df = pd.concat([existing_data, new_entry], ignore_index=True)
         conn.update(spreadsheet=SHEET_URL, data=updated_df)
-        return True, "數據已成功永久存入！"
+        return True, "數據已成功存入 Google Sheets！"
     except Exception as e:
         return False, f"存檔失敗：{e}"
 
@@ -61,7 +61,7 @@ with tab1:
                 raw_data = st.text_area("請貼上 Lap 數據", height=150)
 
             if st.button("啟動 AI 深度分析"):
-                with st.spinner("教練閱卷中..."):
+                with st.spinner("教練正在閱卷中..."):
                     prompt = f"分析生理與技術指標：體重{st.session_state.weight}, MHR:{st.session_state.max_hr}, RHR:{st.session_state.rest_hr}, GCT:{gct}ms, 垂直振幅:{v_osc}cm。數據內容：{raw_data}"
                     response = model.generate_content(prompt)
                     st.session_state.last_analysis = response.text
@@ -70,24 +70,42 @@ with tab1:
                 st.divider()
                 st.markdown(st.session_state.last_analysis)
                 st.subheader("💾 數據儲存確認")
-                final_vo2 = st.number_input("請輸入最終 VO2 Max (供存檔)", value=42.0, step=0.1)
-                if st.button("確認存入雲端數據庫"):
+                final_vo2 = st.number_input("確認本次推算的 VO2 Max", value=42.0, step=0.1)
+                if st.button("確認存入 Google Sheets"):
                     success, msg = push_to_sheets(conn, run_date, final_vo2, run_type, gct, v_osc)
                     if success: st.success(msg)
                     else: st.error(msg)
                     
         except Exception as e:
-            st.error(f"API 連線異常：{e}")
+            st.error(f"連線異常：{e}")
     else:
-        st.info("👋 請先輸入 API Key 以開啟系統。")
+        st.info("👋 請輸入 API Key。")
 
 with tab2:
     st.header("📈 $VO_2 Max$ 與技術趨勢")
     try:
+        # 讀取完整數據
         df = conn.read(spreadsheet=SHEET_URL)
         if df is not None and not df.empty:
             df["日期"] = pd.to_datetime(df["日期"])
             df = df.sort_values("日期")
             
-            st.subheader("體能進步趨勢 (VO2 Max)")
-            st.line_chart(df.set_index("日期")["VO
+            # 1. 體能趨勢圖
+            if "VO2_Max" in df.columns:
+                st.subheader("體能進步趨勢 (VO2 Max)")
+                st.line_chart(df.set_index("日期")["VO2_Max"])
+            
+            # 2. 技術指標圖
+            if "GCT" in df.columns:
+                st.subheader("技術指標趨勢 (觸地時間 GCT)")
+                st.line_chart(df.set_index("日期")["GCT"])
+            
+            st.divider()
+            # 3. AI 進步預測
+            if len(df) >= 3:
+                if st.button("生成 AI 進步預測報告"):
+                    history_str = df.tail(10).to_string()
+                    pred_res = model.generate_content(f"分析此數據並給予下月預測：\n{history_str}")
+                    st.info(pred_res.text)
+            else:
+                st
