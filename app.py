@@ -4,7 +4,7 @@ import pandas as pd
 import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# --- 試算表設定 ---
+# --- 試算表與設定 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/16niyheTwWVts9A6aKRiOx2OpJypQAIeodE08TN9cERU/edit?usp=sharing"
 
 def push_to_sheets(conn, run_date, final_vo2, run_type, gct, v_osc):
@@ -70,4 +70,40 @@ with tab1:
             if st.session_state.last_analysis:
                 st.markdown(st.session_state.last_analysis)
                 st.divider()
-                f_vo2 = st.number_input("確認 VO2 Max 數字", value=42.0, step=0.
+                # 這裡修正了導致錯誤的斷碼
+                f_vo2 = st.number_input("確認 VO2 Max 數字", value=42.0, step=0.1)
+                if st.button("確認存入雲端"):
+                    s, m = push_to_sheets(conn, run_date, f_vo2, run_type, gct_val, v_osc_val)
+                    if s: st.success(m)
+                    else: st.error(m)
+        except Exception as e:
+            st.error(f"連線錯誤: {e}")
+
+# --- Tab 2: 趨勢分析 ---
+with tab2:
+    st.header("📈 長期趨勢監控")
+    try:
+        df = conn.read(spreadsheet=SHEET_URL)
+        if df is not None and not df.empty:
+            df["日期"] = pd.to_datetime(df["日期"])
+            df = df.sort_values("日期")
+            
+            # VO2 Max 圖表
+            st.subheader("體能發展 (VO2 Max)")
+            st.line_chart(df.set_index("日期")["VO2_Max"])
+            
+            # GCT 圖表
+            if "GCT" in df.columns:
+                st.subheader("技術發展 (觸地時間)")
+                st.line_chart(df.set_index("日期")["GCT"])
+            
+            # 數據表與預測
+            st.divider()
+            if len(df) >= 3 and st.button("生成 AI 進步預測"):
+                hist = df.tail(10).to_string()
+                st.info(model.generate_content(f"分析趨勢並預測: {hist}").text)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.write("目前尚無數據，請先完成一次存檔。")
+    except Exception as e:
+        st.write("等待數據載入中...")
