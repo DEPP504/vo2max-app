@@ -29,13 +29,21 @@ with tab1:
     if api_key:
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            except:
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            # 拿掉 'models/' 前綴嘗試
-            model = genai.GenerativeModel(available_models[0].replace('models/', ''))
         
-        st.success(f"系統已成功連線")
+        # --- 自動模型相容邏輯 ---
+        # 1. 取得所有可用的模型名稱
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # 2. 篩選出最適合的 flash 或 pro
+        # 雲端有時需要去掉 'models/' 前綴才能運作
+        target = "models/gemini-1.5-flash"
+        if target not in available_models:
+            target = available_models[0] # 若找不到，就選該 API Key 權限下的第一個
+            
+        model_name = target.replace("models/", "") # 關鍵修正：去除前綴
+        model = genai.GenerativeModel(model_name)
+        
+        st.success(f"✅ 已成功連線至：{model_name}")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -75,3 +83,4 @@ with tab2:
     else:
 
         st.write("目前尚無歷史紀錄。")
+
