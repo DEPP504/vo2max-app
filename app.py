@@ -33,36 +33,28 @@ with tab1:
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("📊 生理與技術指標")
-                st.session_state.weight = st.number_input("體 weight (kg)", value=st.session_state.weight)
+                st.session_state.weight = st.number_input("體重 (kg)", value=st.session_state.weight)
                 st.session_state.max_hr = st.number_input("最大心率 (bpm)", value=st.session_state.max_hr)
                 st.session_state.rest_hr = st.number_input("安靜心率 (bpm)", value=st.session_state.rest_hr)
-                gct = st.number_input("觸地時間 (ms) - 選填", value=200, help="頂尖跑者通常低於 200ms")
+                gct = st.number_input("觸地時間 (ms) - 選填", value=200)
                 v_osc = st.number_input("垂直振幅 (cm) - 選填", value=8.0)
             
             with col2:
                 st.subheader("📅 訓練內容")
                 run_date = st.date_input("訓練日期", datetime.date.today())
                 run_type = st.selectbox("訓練類型", ["間歇跑 (Interval)", "穩定跑 (E/M/T)"])
-                raw_data = st.text_area("請貼上 Lap 數據", height=150, placeholder="例如：1. 2:47/km, HR 175...")
+                raw_data = st.text_area("請貼上 Lap 數據", height=150)
 
             if st.button("啟動 AI 深度分析"):
-                with st.spinner("AI 教練正在交叉比對生理與技術指標..."):
-                    prompt = f"""
-                    你是一位運動科學家。分析以下數據並給出專業評價：
-                    - 生理指標：體重{st.session_state.weight}kg, MHR:{st.session_state.max_hr}, RHR:{st.session_state.rest_hr}。
-                    - 技術指標：觸地時間{gct}ms, 垂直振幅{v_osc}cm。
-                    - 跑步數據：{raw_data}
-                    
-                    請執行：
-                    1. 根據觸地時間與速度，分析跑者的彈性回饋效率。
-                    2. 推算 VO2 Max 數字。
-                    3. 給出下週的針對性建議（關於如何維持速度並減少觸地時間）。
-                    """
+                with st.spinner("AI 教練正在運算中..."):
+                    prompt = f"分析：體重{st.session_state.weight}kg, MHR:{st.session_state.max_hr}, RHR:{st.session_state.rest_hr}, GCT:{gct}ms, 垂直振幅:{v_osc}cm。數據：{raw_data}"
                     response = model.generate_content(prompt)
                     st.markdown(response.text)
                 
                 st.divider()
                 st.subheader("確認存檔")
                 final_vo2 = st.number_input("確認推算的 VO2 Max", value=42.0, step=0.1)
+                
                 if st.button("確認存入 Google Sheets"):
-                    existing_data = conn.read(
+                    # 修正後的讀取與寫入邏輯
+                    existing_data = conn.read(spreadsheet=SHEET_URL)
